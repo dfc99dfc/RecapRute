@@ -250,7 +250,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setCenter,
       setRangeCenter,
       setRadiusM,
-      setCenterAndRadius: (c, m) => { setCenter(c); setRadiusM(m); },
+      setCenterAndRadius: (c, m) => { setCenter(c); setRadiusM(m); setRangeCenter(c); },
       hasCenter,
       setHasCenter,
       route,

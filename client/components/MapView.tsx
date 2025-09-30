@@ -277,7 +277,7 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
           </Popup>
         )}
 
-        <Circle center={[rangeCenter.lat, rangeCenter.lng]} radius={radiusM} pathOptions={{ color: "#22c55e", dashArray: "6 6", weight: 1, fillOpacity: 0 }} />
+        <Circle center={[rangeCenter.lat, rangeCenter.lng]} radius={radiusM} pathOptions={{ color: "#22c55e", dashArray: "6 6", weight: 3, fillOpacity: 0 }} />
         <Marker position={[center.lat, center.lng]} icon={createCenterIcon() as unknown as L.Icon} />
         <Marker position={[rangeCenter.lat, rangeCenter.lng]} draggable eventHandlers={{ dragend: (e) => { const ll = (e.target as any).getLatLng(); setRangeCenter({ lat: ll.lat, lng: ll.lng }); } }} icon={new DivIcon({ className: "rr-emoji-icon", html: `<div style=\"display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#22c55e;color:#fff;border:2px solid #065f46;border-radius:9999px;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translate(-11px,-22px);font-size:12px;line-height:1;\">⬤</div>` }) as unknown as L.Icon} />
         {route?.coordinates && (
