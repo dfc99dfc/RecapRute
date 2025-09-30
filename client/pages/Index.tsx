@@ -39,9 +39,6 @@ function HeaderBar() {
           }}>🗂️ My routes</Button>
         </div>
       </div>
-      <div className="absolute left-1/2 top-1 -translate-x-1/2">
-        <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug">RoadReady</div>
-      </div>
     </div>
   );
 }

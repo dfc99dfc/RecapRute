@@ -17,7 +17,7 @@ function downloadJson(filename: string, data: unknown) {
 export default function ExportImportButtons() {
   const doExport = async () => {
     const current = await persistence.readAll();
-    downloadJson("roadready-data.json", current);
+    downloadJson("recaprule-data.json", current);
     toast.success("Data exported");
   };
 

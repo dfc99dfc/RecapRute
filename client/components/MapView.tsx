@@ -287,7 +287,8 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
               const coords = route.coordinates;
               const n = coords.length;
               if (n < 4) return null;
-              const handleCount = Math.min(12, Math.max(4, Math.floor(n / 50)));
+              const baseCount = Math.min(12, Math.max(4, Math.floor(n / 50)));
+              const handleCount = Math.min(24, baseCount * 2);
               const idxs: number[] = [];
               for (let i = 1; i < handleCount + 1; i++) {
                 const j = Math.floor((i / (handleCount + 1)) * (n - 1));

@@ -78,7 +78,7 @@ async function exportData(): Promise<boolean> {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'roadready-data.json';
+    a.download = 'recaprule-data.json';
     document.body.appendChild(a);
     a.click();
     a.remove();
