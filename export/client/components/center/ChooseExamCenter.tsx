@@ -59,7 +59,8 @@ export default function ChooseExamCenter({ open, onOpenChange, initialCenter, in
 
   const onOk = () => {
     const c = selected ? { lat: parseFloat(selected.lat), lng: parseFloat(selected.lon) } : initialCenter;
-    onConfirm(c, Math.max(1, radiusKm) * 1000);
+    const km = Math.min(15, Math.max(1, radiusKm));
+    onConfirm(c, km * 1000);
     onOpenChange(false);
   };
 
@@ -96,7 +97,7 @@ export default function ChooseExamCenter({ open, onOpenChange, initialCenter, in
               <span>Distance range</span>
               <span className="tabular-nums">{radiusKm} km</span>
             </div>
-            <Slider value={[radiusKm]} onValueChange={(v) => setRadiusKm(v[0])} min={1} max={50} step={1} />
+            <Slider value={[radiusKm]} onValueChange={(v) => setRadiusKm(v[0])} min={1} max={15} step={1} />
           </div>
           <div className="text-right">
             <Button variant="secondary" className="mr-2" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -9,6 +9,21 @@ const ORS_BASE = "https://api.openrouteservice.org/ors/v2";
 const OSRM_BASE = "https://router.project-osrm.org";
 const TARGET_SEC = 50 * 60;
 
+// Safe fetch that never throws; returns null on timeout or error
+async function safeFetch(url: string, init?: RequestInit, timeoutMs = 12000): Promise<Response | null> {
+  try {
+    const f = fetch(url, init);
+    const res = await Promise.race([
+      f,
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), timeoutMs)),
+    ]);
+    if (res === "timeout") return null;
+    return res as Response;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- Overpass utilities ----------
 async function fetchOverpass(q: string) {
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return null;
@@ -17,27 +32,29 @@ async function fetchOverpass(q: string) {
     "https://overpass.kumi.systems/api/interpreter",
   ];
   for (const ep of endpoints) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12000);
     try {
-      const res = await fetch(`${ep}?data=${encodeURIComponent(q)}`, {
+      const url = `${ep}?data=${encodeURIComponent(q)}`;
+      const f = fetch(url, {
         mode: "cors",
         cache: "no-store",
         credentials: 'omit',
         redirect: 'follow',
         referrerPolicy: 'no-referrer',
-        signal: ctrl.signal,
       });
-      if (!res.ok) { clearTimeout(t); continue; }
+      f.catch(() => {});
+      const resOrTimeout = await Promise.race([
+        f,
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 12000)),
+      ]);
+      if (resOrTimeout === "timeout") continue;
+      const res = resOrTimeout as Response;
+      if (!res.ok) continue;
       const text = await res.text();
-      clearTimeout(t);
       try {
         return JSON.parse(text);
       } catch {}
     } catch {
       // continue to next endpoint
-    } finally {
-      clearTimeout(t);
     }
   }
   return null;
@@ -133,14 +150,15 @@ async function buildCandidates(center: { lat: number; lng: number }, radius = SI
 
 // ---------- ORS/OSRM helpers ----------
 async function snapPoint([lon, lat]: [number, number]): Promise<[number, number]> {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return [lon, lat];
   if (ORS_KEY) {
     try {
-      const res = await fetch(`${ORS_BASE}/snap/driving-car`, {
+      const res = await safeFetch(`${ORS_BASE}/snap/driving-car`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: ORS_KEY },
         body: JSON.stringify({ locations: [[lon, lat]], radius: 200 }),
       });
-      if (res.ok) {
+      if (res?.ok) {
         const js = await res.json();
         const snapped: [number, number] | undefined = js?.snappedPoints?.[0]?.location;
         if (snapped) return snapped;
@@ -149,8 +167,8 @@ async function snapPoint([lon, lat]: [number, number]): Promise<[number, number]
   }
   // Fallback OSRM nearest
   try {
-    const res = await fetch(`${OSRM_BASE}/nearest/v1/driving/${lon},${lat}`);
-    if (res.ok) {
+    const res = await safeFetch(`${OSRM_BASE}/nearest/v1/driving/${lon},${lat}`);
+    if (res?.ok) {
       const js = await res.json();
       const p = js?.waypoints?.[0]?.location;
       if (Array.isArray(p) && p.length >= 2) return [p[0], p[1]];
@@ -163,12 +181,12 @@ async function routeMulti(coordinates: [number, number][]): Promise<{ coords: [n
   // expects [lon,lat]
   if (ORS_KEY) {
     try {
-      const res = await fetch(`${ORS_BASE}/directions/driving-car/geojson`, {
+      const res = await safeFetch(`${ORS_BASE}/directions/driving-car/geojson`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: ORS_KEY },
         body: JSON.stringify({ coordinates }),
       });
-      if (res.ok) {
+      if (res?.ok) {
         const js = await res.json();
         const feat = js?.features?.[0];
         const coords = feat?.geometry?.coordinates as [number, number][] | undefined;
@@ -180,8 +198,8 @@ async function routeMulti(coordinates: [number, number][]): Promise<{ coords: [n
   // Fallback OSRM
   const coordsStr = coordinates.map((c) => `${c[0]},${c[1]}`).join(";");
   const url = `${OSRM_BASE}/route/v1/driving/${coordsStr}?alternatives=false&overview=full&geometries=geojson`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("routing failed");
+  const res = await safeFetch(url);
+  if (!res || !res.ok) throw new Error("routing failed");
   const js = await res.json();
   const r = js?.routes?.[0];
   if (!r) throw new Error("no route");
@@ -309,11 +327,12 @@ async function buildRoadLoopWithinRadius(examCenter: { lat: number; lng: number 
 }
 
 export function useRouteSimulation() {
-  const { center, rangeCenter, radiusM, setRoute, route } = useAppState();
+  const { center, rangeCenter, radiusM, setRoute, route, speedLimitsOn, setSpeedLimitsOn } = useAppState();
   const [loading, setLoading] = useState(false);
 
   const simulate = useCallback(async () => {
     if (loading) return;
+    if (speedLimitsOn) setSpeedLimitsOn(false);
     setLoading(true);
     try {
       // 0) Fetch avoid areas (forest/wood) polygons once
@@ -414,7 +433,7 @@ export function useRouteSimulation() {
     } finally {
       setLoading(false);
     }
-  }, [center, rangeCenter, radiusM, setRoute, route]);
+  }, [center, rangeCenter, radiusM, setRoute, route, speedLimitsOn, setSpeedLimitsOn]);
 
   return { loading, simulate } as const;
 }

@@ -6,7 +6,7 @@ import RouteSimulator, { useRouteSimulation } from "@/components/RouteSimulator"
 import { AppStateProvider, useAppState } from "@/state/AppState";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { KEMI_AJOVARMA_CENTER, SPEED_COLORS, SPEED_WEIGHTS } from "@/constants";
+import { KEMI_AJOVARMA_CENTER, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER } from "@/constants";
 import ExportImportButtons from "@/components/export-import/ExportImportButtons";
 import ChooseExamCenter from "@/components/center/ChooseExamCenter";
 import MyRoutesSheet from "@/components/routes/MyRoutesSheet";
@@ -30,6 +30,9 @@ function HeaderBar() {
           {route?.coordinates && (
             <Button size="sm" className="w-auto" variant="outline" onClick={() => setRoute(null)}>🧹 Clear route</Button>
           )}
+          {loading && (
+            <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug text-right">Might take minutes</div>
+          )}
           <Button size="sm" className="w-auto bg-black text-white hover:bg-black/90" disabled={loading} onClick={() => { if (route?.coordinates) { saveCurrentRoute(); } else { if (!loading) simulate(); } }}>
             {route?.coordinates ? "💾 Save this route" : (loading ? `Route generating${".".repeat(dots)}` : "🛣️ Simulate exam route")}
           </Button>
@@ -45,7 +48,7 @@ function HeaderBar() {
 
 function BottomBar() {
   const isMobile = useIsMobile();
-  const { speedLimitsOn, setSpeedLimitsOn, setPlacingMode, center, radiusM, setCenterAndRadius, hasCenter, setHasCenter, setRoute } = useAppState();
+  const { speedLimitsOn, setSpeedLimitsOn, speedVisibility, setSpeedVisibility, setPlacingMode, center, radiusM, setCenterAndRadius, hasCenter, setHasCenter, setRoute } = useAppState();
   const [mindOpen, setMindOpen] = useState(false);
   const [chooseOpen, setChooseOpen] = useState(false);
 
@@ -64,13 +67,16 @@ function BottomBar() {
             </div>
           )}
           {speedLimitsOn && (
-            <div className="w-28 rounded-lg bg-white/90 p-2 shadow">
-              {["120","100","80","60","50","40","30","20"].map((k) => (
-                <div key={k} className="flex items-center justify-between py-1">
-                  <span className="mr-2 inline-block w-12 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
-                  <span className="text-sm tabular-nums">{k}</span>
-                </div>
-              ))}
+            <div className="w-32 rounded-lg bg-white/90 p-2 shadow">
+              {(SPEED_LEGEND_ORDER as readonly string[]).map((k) => {
+                const on = speedVisibility[k] !== false;
+                return (
+                  <button key={k} className={`flex w-full items-center justify-between py-1 ${on ? '' : 'opacity-30'}`} onClick={() => setSpeedVisibility({ ...speedVisibility, [k]: !on })}>
+                    <span className="mr-2 inline-block w-16 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
+                    <span className="text-sm tabular-nums">{k}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
           <div className="inline-flex w-auto whitespace-nowrap items-center gap-2 rounded-full bg-white/90 px-3 py-2 shadow">
@@ -96,13 +102,16 @@ function BottomBar() {
             </div>
           )}
           {speedLimitsOn && (
-            <div className="w-28 rounded-lg bg-white/90 p-2 shadow">
-              {["120","100","80","60","50","40","30","20"].map((k) => (
-                <div key={k} className="flex items-center justify-between py-1">
-                  <span className="mr-2 inline-block w-12 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
-                  <span className="text-sm tabular-nums">{k}</span>
-                </div>
-              ))}
+            <div className="w-32 rounded-lg bg-white/90 p-2 shadow">
+              {(SPEED_LEGEND_ORDER as readonly string[]).map((k) => {
+                const on = speedVisibility[k] !== false;
+                return (
+                  <button key={k} className={`flex w-full items-center justify-between py-1 ${on ? '' : 'opacity-30'}`} onClick={() => setSpeedVisibility({ ...speedVisibility, [k]: !on })}>
+                    <span className="mr-2 inline-block w-16 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
+                    <span className="text-sm tabular-nums">{k}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
           <div className="inline-flex w-auto whitespace-nowrap items-center gap-2 rounded-full bg-white/90 px-3 py-2 shadow">
@@ -165,6 +174,9 @@ function MapScene() {
         <div className="pointer-events-auto flex flex-col items-end gap-2">
           {route?.coordinates && (
             <Button className="h-12 w-auto text-base" variant="outline" onClick={() => setRoute(null)}>🧹 Clear route</Button>
+          )}
+          {loading && (
+            <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug text-right">Might take minutes</div>
           )}
           <Button className="h-12 w-auto px-3 text-base bg-black text-white hover:bg-black/90" disabled={loading} onClick={() => { if (route?.coordinates) { saveCurrentRoute(); } else { if (!loading) simulate(); } }}>
             {route?.coordinates ? "💾 Save this route" : (loading ? `Route generating${".".repeat(dots)}` : "🛣️ Simulate exam route")}

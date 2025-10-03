@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, Circle, Pane, Tooltip } from "react-leaflet";
 import L, { DivIcon } from "leaflet";
 import EditPinModal from "@/components/pins/EditPinModal";
-import { DEFAULT_SPEED_RADIUS_M, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER } from "@/constants";
+import { DEFAULT_SPEED_RADIUS_M, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER, KEMI_AJOVARMA_CENTER } from "@/constants";
 import { useAppState } from "@/state/AppState";
 import { parseMaxSpeed, distancePointToPolylineMeters, haversineDistanceMeters } from "@/utils/mapUtils";
 
@@ -17,10 +17,10 @@ L.Icon.Default.mergeOptions({
 
 export type RouteGeo = [number, number][];
 
-function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPEED_RADIUS_M, enabled = true) {
+function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPEED_RADIUS_M, enabled = true, lightMode = false) {
   const [segments, setSegments] = useState<{ id: number; latlngs: [number, number][], speed?: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const key = useMemo(() => `rr_maxspeed_${center.lat.toFixed(3)}_${center.lng.toFixed(3)}_${radius}`, [center, radius]);
+  const key = useMemo(() => `rr_maxspeed_${center.lat.toFixed(3)}_${center.lng.toFixed(3)}_${radius}_${lightMode ? 'light' : 'full'}`,[center, radius, lightMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,39 +32,43 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
         if (cached) {
           const parsed = JSON.parse(cached);
           const normalized = Array.isArray(parsed)
-            ? parsed.map((p: any, i: number) => ({ id: p.id ?? i, latlngs: p.latlngs, speed: p.speed }))
+            ? parsed.map((p: any, i: number) => ({ id: p.id ?? i, latlngs: p.latlngs, speed: p.speed, hw: p.hw, isMajor: p.isMajor }))
             : [];
           if (!cancelled) setSegments(normalized);
           try { sessionStorage.setItem(key, JSON.stringify(normalized)); } catch {}
           setLoading(false);
           return;
         }
-        // Fetch ALL highway ways in area; derive speed if present
-        const q = `[out:json][timeout:25];(way(around:${radius},${center.lat},${center.lng})["highway"];);out geom;`;
+        // Fetch ALL highway ways in area; do not restrict in lightMode to allow legend-based filtering
+        const q = `[out:json][timeout:25];(way(around:${radius},${center.lat},${center.lng})["highway"];);out geom tags;`;
         const endpoints = [
           "https://overpass-api.de/api/interpreter",
           "https://overpass.kumi.systems/api/interpreter",
+          "https://overpass.nchc.org.tw/api/interpreter",
+          "https://z.overpass-api.de/api/interpreter",
         ];
         async function safeFetchOverpass(u: string) {
           if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return null;
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 12000);
           try {
-            const res = await fetch(u, {
+            const f = fetch(u, {
               mode: 'cors',
               cache: 'no-store',
               credentials: 'omit',
               redirect: 'follow',
               referrerPolicy: 'no-referrer',
-              signal: ctrl.signal,
-            });
-            if (!res.ok) return null;
-            const text = await res.text();
+            }).catch(() => null as any);
+            const resOrTimeout = await Promise.race([
+              f,
+              new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 12000)),
+            ]);
+            if (resOrTimeout === 'timeout' || resOrTimeout == null) return null;
+            const res = resOrTimeout as Response;
+            if (!res || !res.ok) return null;
+            const text = await res.text().catch(() => null as any);
+            if (!text) return null;
             try { return JSON.parse(text); } catch { return null; }
           } catch {
             return null;
-          } finally {
-            clearTimeout(t);
           }
         }
         let json = null as any;
@@ -97,7 +101,7 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
     return () => {
       cancelled = true;
     };
-  }, [key, center, radius, enabled]);
+  }, [key, center, radius, enabled, lightMode]);
 
   return { segments, loading };
 }
@@ -157,15 +161,15 @@ function RouteAnimatedOverlay({ coords }: { coords: [number, number][] }) {
   }
   return (
     <>
-      <Polyline positions={coords} pathOptions={{ color: "#000000", weight: 5, opacity: 0.5 }} />
-      {head.length >= 2 && <Polyline positions={head} pathOptions={{ color: "#000000", weight: 6, opacity: 1 }} />}
+      <Polyline pane="routePane" positions={coords} pathOptions={{ color: "#000000", weight: 5, opacity: 0.5 }} />
+      {head.length >= 2 && <Polyline pane="routePane" positions={head} pathOptions={{ color: "#000000", weight: 6, opacity: 1 }} />}
     </>
   );
 }
 
 export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: number, lng: number) => void }) {
-  const { speedLimitsOn, pins, pinView, user, collectPin, route, setRoute, center, rangeCenter, setRangeCenter, radiusM, deletePin } = useAppState();
-  const { segments } = useOverpassMaxspeed(rangeCenter, radiusM, speedLimitsOn);
+  const { speedLimitsOn, speedVisibility, cityLightMode, pins, pinView, user, collectPin, route, setRoute, center, rangeCenter, setRangeCenter, radiusM, deletePin } = useAppState();
+  const { segments } = useOverpassMaxspeed(rangeCenter, radiusM, speedLimitsOn, cityLightMode);
 
   const [speedEdits, setSpeedEdits] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -203,10 +207,15 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <Pane name="speedPane" style={{ zIndex: 410 }} />
+        <Pane name="routePane" style={{ zIndex: 450 }} />
+
         {speedLimitsOn &&
           segments.map((s, idx) => {
             const wayKey = String((s as any).id ?? idx);
             const effective = (speedEdits[wayKey] ?? s.speed) as string | undefined;
+            const label = effective && (SPEED_WEIGHTS as any)[effective] != null ? effective : 'ungiven';
+            if (speedVisibility[label] === false) return null;
             const mid = s.latlngs[Math.floor(s.latlngs.length / 2)] || s.latlngs[0];
             const dist = mid ? haversineDistanceMeters({ lat: mid[0], lng: mid[1] }, rangeCenter) : Infinity;
             const inside = Number.isFinite(dist) && dist <= radiusM;
@@ -221,9 +230,10 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
                       setEditAnchor([e.latlng.lat, e.latlng.lng]);
                     },
                   }}
+                  pane="speedPane"
                   pathOptions={{
-                    color: (effective && SPEED_COLORS[effective]) || "#64748b",
-                    weight: (effective && SPEED_WEIGHTS[effective]) ?? SPEED_WEIGHTS["20"],
+                    color: (effective && SPEED_COLORS[effective]) || (SPEED_COLORS as any)["ungiven"] || "#64748b",
+                    weight: (effective && SPEED_WEIGHTS[effective]) ?? (SPEED_WEIGHTS as any)["ungiven"] ?? SPEED_WEIGHTS["20"],
                     opacity: inside ? (effective ? 0.9 : 0.5) : 0.15,
                     className: "rr-speed-edit rr-pencil-cursor",
                   }}
@@ -238,6 +248,7 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
                         setEditAnchor([e.latlng.lat, e.latlng.lng]);
                       },
                     }}
+                    pane="speedPane"
                     pathOptions={{
                       color: "#000000",
                       weight: 12,
@@ -279,7 +290,11 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
 
         <Circle center={[rangeCenter.lat, rangeCenter.lng]} radius={radiusM} pathOptions={{ color: "#22c55e", dashArray: "6 6", weight: 3, fillOpacity: 0 }} />
         <Marker position={[center.lat, center.lng]} icon={createCenterIcon() as unknown as L.Icon} />
-        <Marker position={[rangeCenter.lat, rangeCenter.lng]} draggable eventHandlers={{ dragend: (e) => { const ll = (e.target as any).getLatLng(); setRangeCenter({ lat: ll.lat, lng: ll.lng }); } }} icon={new DivIcon({ className: "rr-emoji-icon", html: `<div style=\"display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#22c55e;color:#fff;border:2px solid #065f46;border-radius:9999px;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translate(-11px,-22px);font-size:12px;line-height:1;\">⬤</div>` }) as unknown as L.Icon} />
+        <Marker position={[rangeCenter.lat, rangeCenter.lng]} draggable eventHandlers={{ dragend: (e) => { const ll = (e.target as any).getLatLng(); setRangeCenter({ lat: ll.lat, lng: ll.lng }); } }} icon={new DivIcon({ className: "rr-emoji-icon", html: `<div style=\"display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#22c55e;color:#fff;border:2px solid #065f46;border-radius:9999px;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translate(-11px,-22px);font-size:12px;line-height:1;\">⬤</div>` }) as unknown as L.Icon}>
+          <Tooltip permanent direction="right" offset={[14, -8]} className="rr-no-arrow-tooltip !bg-transparent !border-0 !shadow-none p-0">
+            <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug">drag the dots to re-position</div>
+          </Tooltip>
+        </Marker>
         {route?.coordinates && (
           <>
             <RouteAnimatedOverlay coords={route.coordinates.map((c) => [c[1], c[0]]) as [number, number][]} />

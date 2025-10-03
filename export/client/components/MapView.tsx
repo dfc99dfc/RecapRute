@@ -18,7 +18,7 @@ L.Icon.Default.mergeOptions({
 export type RouteGeo = [number, number][];
 
 function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPEED_RADIUS_M, enabled = true) {
-  const [segments, setSegments] = useState<{ id: number; latlngs: [number, number][], speed?: string }[]>([]);
+  const [segments, setSegments] = useState<{ id: number; latlngs: [number, number][], speed?: string, hw?: string, isMajor?: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
   const key = useMemo(() => `rr_maxspeed_${center.lat.toFixed(3)}_${center.lng.toFixed(3)}_${radius}`, [center, radius]);
 
@@ -32,7 +32,7 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
         if (cached) {
           const parsed = JSON.parse(cached);
           const normalized = Array.isArray(parsed)
-            ? parsed.map((p: any, i: number) => ({ id: p.id ?? i, latlngs: p.latlngs, speed: p.speed }))
+            ? parsed.map((p: any, i: number) => ({ id: p.id ?? i, latlngs: p.latlngs, speed: p.speed, hw: p.hw, isMajor: p.isMajor }))
             : [];
           if (!cancelled) setSegments(normalized);
           try { sessionStorage.setItem(key, JSON.stringify(normalized)); } catch {}
@@ -47,24 +47,25 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
         ];
         async function safeFetchOverpass(u: string) {
           if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return null;
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 12000);
           try {
-            const res = await fetch(u, {
+            const f = fetch(u, {
               mode: 'cors',
               cache: 'no-store',
               credentials: 'omit',
               redirect: 'follow',
               referrerPolicy: 'no-referrer',
-              signal: ctrl.signal,
             });
+            const resOrTimeout = await Promise.race([
+              f,
+              new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 12000)),
+            ]);
+            if (resOrTimeout === 'timeout') return null;
+            const res = resOrTimeout as Response;
             if (!res.ok) return null;
             const text = await res.text();
             try { return JSON.parse(text); } catch { return null; }
           } catch {
             return null;
-          } finally {
-            clearTimeout(t);
           }
         }
         let json = null as any;
@@ -163,6 +164,20 @@ function RouteAnimatedOverlay({ coords }: { coords: [number, number][] }) {
   );
 }
 
+function ZoomWatcher({ onChange }: { onChange: (z: number) => void }) {
+  useMapEvents({
+    zoomend(e) {
+      // @ts-ignore
+      onChange(e.target.getZoom());
+    },
+    moveend(e) {
+      // @ts-ignore
+      onChange(e.target.getZoom());
+    },
+  });
+  return null;
+}
+
 export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: number, lng: number) => void }) {
   const { speedLimitsOn, pins, pinView, user, collectPin, route, setRoute, center, rangeCenter, setRangeCenter, radiusM, deletePin } = useAppState();
   const { segments } = useOverpassMaxspeed(rangeCenter, radiusM, speedLimitsOn);
@@ -204,7 +219,10 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
         />
 
         {speedLimitsOn &&
-          segments.map((s, idx) => {
+          segments
+            .filter((s) => (s.isMajor ? true : showDetails))
+            .sort((a, b) => (b.isMajor ? 1 : 0) - (a.isMajor ? 1 : 0))
+            .map((s, idx) => {
             const wayKey = String((s as any).id ?? idx);
             const effective = (speedEdits[wayKey] ?? s.speed) as string | undefined;
             const mid = s.latlngs[Math.floor(s.latlngs.length / 2)] || s.latlngs[0];

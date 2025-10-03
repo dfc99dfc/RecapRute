@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { persistence, type StorageData } from "@/utils/persistence";
+import { toast } from "@/hooks/use-toast";
 
 export type User = {
   id: string;
@@ -67,6 +68,10 @@ export type AppStateShape = {
 
   speedLimitsOn: boolean;
   setSpeedLimitsOn: (v: boolean) => void;
+  speedVisibility: Record<string, boolean>;
+  setSpeedVisibility: (v: Record<string, boolean>) => void;
+  cityLightMode: boolean;
+  setCityLightMode: (v: boolean) => void;
 
   placingMode: boolean;
   setPlacingMode: (v: boolean) => void;
@@ -112,6 +117,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [pins, setPins] = useState<Pin[]>([]);
   const [pinView, setPinView] = useState<"my" | "public">("public");
   const [speedLimitsOn, setSpeedLimitsOn] = useState(false);
+  const [speedVisibility, setSpeedVisibility] = useState<Record<string, boolean>>({});
+  const [cityLightMode, setCityLightMode] = useState<boolean>(false);
   const [placingMode, setPlacingMode] = useState(false);
   const [route, setRoute] = useState<RouteShape>(null);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
@@ -134,6 +141,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (typeof data.radiusM === 'number') setRadiusM(data.radiusM);
         if (typeof (data as any).hasCenter === 'boolean') setHasCenter((data as any).hasCenter);
         if (Array.isArray((data as any).savedRoutes)) setSavedRoutes((data as any).savedRoutes as SavedRoute[]);
+        if ((data as any).speedVisibility && typeof (data as any).speedVisibility === 'object') setSpeedVisibility((data as any).speedVisibility as Record<string, boolean>);
+        if (typeof (data as any).cityLightMode === 'boolean') setCityLightMode((data as any).cityLightMode as boolean);
       } catch {}
     })();
     return () => { mounted = false; };
@@ -152,6 +161,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     persistence.savePartial({ center }).catch(() => {});
   }, [center]);
+  useEffect(() => {
+    persistence.savePartial({ speedVisibility }).catch(() => {});
+  }, [speedVisibility]);
+  useEffect(() => {
+    persistence.savePartial({ cityLightMode }).catch(() => {});
+  }, [cityLightMode]);
   useEffect(() => {
     persistence.savePartial({ rangeCenter }).catch(() => {});
   }, [rangeCenter]);
@@ -216,6 +231,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (!route || !route.coordinates || route.coordinates.length < 2) return;
     const entry: SavedRoute = { id: `route_${Date.now()}`, createdAt: new Date().toISOString(), route: JSON.parse(JSON.stringify(route)) };
     setSavedRoutes((prev) => [entry, ...prev]);
+    try {
+      toast({ title: 'Your route is saved! check it in "My routes"' });
+    } catch {}
+    try {
+      const evt = new CustomEvent('open-my-routes');
+      window.dispatchEvent(evt);
+    } catch {}
   }, [route]);
 
   const loadSavedRoute = useCallback((id: string) => {
@@ -242,6 +264,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setPinView,
       speedLimitsOn,
       setSpeedLimitsOn,
+      speedVisibility,
+      setSpeedVisibility,
+      cityLightMode,
+      setCityLightMode,
       placingMode,
       setPlacingMode,
       center,
@@ -260,7 +286,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       loadSavedRoute,
       deleteSavedRoute,
     }),
-    [user, login, logout, pins, addPin, collectPin, setPinVisibility, updatePin, deletePin, pinView, speedLimitsOn, placingMode, center, rangeCenter, radiusM, route, savedRoutes, saveCurrentRoute, loadSavedRoute, deleteSavedRoute],
+    [user, login, logout, pins, addPin, collectPin, setPinVisibility, updatePin, deletePin, pinView, speedLimitsOn, speedVisibility, cityLightMode, placingMode, center, rangeCenter, radiusM, route, savedRoutes, saveCurrentRoute, loadSavedRoute, deleteSavedRoute],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

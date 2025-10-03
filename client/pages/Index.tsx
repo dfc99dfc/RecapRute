@@ -6,7 +6,8 @@ import RouteSimulator, { useRouteSimulation } from "@/components/RouteSimulator"
 import { AppStateProvider, useAppState } from "@/state/AppState";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { KEMI_AJOVARMA_CENTER, SPEED_COLORS, SPEED_WEIGHTS } from "@/constants";
+import { KEMI_AJOVARMA_CENTER, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER, SPEED_LEGEND_ORDER_EXTENDED } from "@/constants";
+import { isInBigCity } from "@/utils/bigCities";
 import ExportImportButtons from "@/components/export-import/ExportImportButtons";
 import ChooseExamCenter from "@/components/center/ChooseExamCenter";
 import MyRoutesSheet from "@/components/routes/MyRoutesSheet";
@@ -30,6 +31,9 @@ function HeaderBar() {
           {route?.coordinates && (
             <Button size="sm" className="w-auto" variant="outline" onClick={() => setRoute(null)}>🧹 Clear route</Button>
           )}
+          {loading && (
+            <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug text-right">Might take minutes</div>
+          )}
           <Button size="sm" className="w-auto bg-black text-white hover:bg-black/90" disabled={loading} onClick={() => { if (route?.coordinates) { saveCurrentRoute(); } else { if (!loading) simulate(); } }}>
             {route?.coordinates ? "💾 Save this route" : (loading ? `Route generating${".".repeat(dots)}` : "🛣️ Simulate exam route")}
           </Button>
@@ -45,7 +49,7 @@ function HeaderBar() {
 
 function BottomBar() {
   const isMobile = useIsMobile();
-  const { speedLimitsOn, setSpeedLimitsOn, setPlacingMode, center, radiusM, setCenterAndRadius, hasCenter, setHasCenter, setRoute } = useAppState();
+  const { speedLimitsOn, setSpeedLimitsOn, speedVisibility, setSpeedVisibility, setCityLightMode, setPlacingMode, center, radiusM, setCenterAndRadius, hasCenter, setHasCenter, setRoute } = useAppState();
   const [mindOpen, setMindOpen] = useState(false);
   const [chooseOpen, setChooseOpen] = useState(false);
 
@@ -60,17 +64,20 @@ function BottomBar() {
           {speedLimitsOn && (
             <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug">
               <div>click on the road to edit max speed</div>
-              <div>drag the green button with white dot inside to relocate the range</div>
+              <div>click each speed bar to switch on/off</div>
             </div>
           )}
           {speedLimitsOn && (
-            <div className="w-28 rounded-lg bg-white/90 p-2 shadow">
-              {["120","100","80","60","50","40","30","20"].map((k) => (
-                <div key={k} className="flex items-center justify-between py-1">
-                  <span className="mr-2 inline-block w-12 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
-                  <span className="text-sm tabular-nums">{k}</span>
-                </div>
-              ))}
+            <div className="w-32 rounded-lg bg-white/90 p-2 shadow">
+              {(SPEED_LEGEND_ORDER_EXTENDED as readonly string[]).map((k) => {
+                const on = speedVisibility[k] !== false;
+                return (
+                  <button key={k} className={`flex w-full items-center justify-between py-1 ${on ? '' : 'opacity-30'}`} onClick={() => setSpeedVisibility({ ...speedVisibility, [k]: !on })}>
+                    <span className="mr-2 inline-block w-16 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
+                    <span className="text-sm tabular-nums">{k}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
           <div className="inline-flex w-auto whitespace-nowrap items-center gap-2 rounded-full bg-white/90 px-3 py-2 shadow">
@@ -92,17 +99,20 @@ function BottomBar() {
           {speedLimitsOn && (
             <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug">
               <div>click on the road to edit max speed</div>
-              <div>drag the green button with white dot inside to relocate the range</div>
+              <div>click each speed bar to switch on/off</div>
             </div>
           )}
           {speedLimitsOn && (
-            <div className="w-28 rounded-lg bg-white/90 p-2 shadow">
-              {["120","100","80","60","50","40","30","20"].map((k) => (
-                <div key={k} className="flex items-center justify-between py-1">
-                  <span className="mr-2 inline-block w-12 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
-                  <span className="text-sm tabular-nums">{k}</span>
-                </div>
-              ))}
+            <div className="w-32 rounded-lg bg-white/90 p-2 shadow">
+              {(SPEED_LEGEND_ORDER_EXTENDED as readonly string[]).map((k) => {
+                const on = speedVisibility[k] !== false;
+                return (
+                  <button key={k} className={`flex w-full items-center justify-between py-1 ${on ? '' : 'opacity-30'}`} onClick={() => setSpeedVisibility({ ...speedVisibility, [k]: !on })}>
+                    <span className="mr-2 inline-block w-16 rounded-full" style={{ backgroundColor: (SPEED_COLORS as any)[k], height: `${(SPEED_WEIGHTS as any)[k]}px` }} />
+                    <span className="text-sm tabular-nums">{k}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
           <div className="inline-flex w-auto whitespace-nowrap items-center gap-2 rounded-full bg-white/90 px-3 py-2 shadow">
@@ -123,7 +133,25 @@ function BottomBar() {
         onOpenChange={setChooseOpen}
         initialCenter={center}
         initialRadiusM={radiusM}
-        onConfirm={(c, r) => { setCenterAndRadius(c, r); setHasCenter(true); setRoute(null); }}
+        onConfirm={(c, r) => {
+          setCenterAndRadius(c, r);
+          const big = isInBigCity(c.lat, c.lng).match;
+          if (big) {
+            setCityLightMode(true);
+            const vis: Record<string, boolean> = {};
+            for (const k of SPEED_LEGEND_ORDER_EXTENDED as readonly string[]) vis[k] = false;
+            vis["50"] = true;
+            vis["30"] = true;
+            setSpeedVisibility(vis);
+          } else {
+            setCityLightMode(false);
+            const vis: Record<string, boolean> = {};
+            for (const k of SPEED_LEGEND_ORDER_EXTENDED as readonly string[]) vis[k] = true;
+            setSpeedVisibility(vis);
+          }
+          setHasCenter(true);
+          setRoute(null);
+        }}
       />
     </div>
   );
@@ -165,6 +193,9 @@ function MapScene() {
         <div className="pointer-events-auto flex flex-col items-end gap-2">
           {route?.coordinates && (
             <Button className="h-12 w-auto text-base" variant="outline" onClick={() => setRoute(null)}>🧹 Clear route</Button>
+          )}
+          {loading && (
+            <div className="text-[11px] text-muted-foreground max-w-[16rem] leading-snug text-right">Might take minutes</div>
           )}
           <Button className="h-12 w-auto px-3 text-base bg-black text-white hover:bg-black/90" disabled={loading} onClick={() => { if (route?.coordinates) { saveCurrentRoute(); } else { if (!loading) simulate(); } }}>
             {route?.coordinates ? "💾 Save this route" : (loading ? `Route generating${".".repeat(dots)}` : "🛣️ Simulate exam route")}
