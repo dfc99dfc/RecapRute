@@ -132,7 +132,8 @@ function BottomBar() {
         open={chooseOpen}
         onOpenChange={setChooseOpen}
         initialCenter={center}
-        initialRadiusM={radiusM}
+        initialRadiusM={hasCenter ? radiusM : (isInBigCity(center.lat, center.lng).match ? 3000 : 5000)}
+        hasPrevious={hasCenter}
         onConfirm={(c, r) => {
           setCenterAndRadius(c, r);
           const big = isInBigCity(c.lat, c.lng).match;

@@ -3,14 +3,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { isInBigCity } from "@/utils/bigCities";
 
 export type Place = { display_name: string; lat: string; lon: string };
 
-export default function ChooseExamCenter({ open, onOpenChange, initialCenter, initialRadiusM, onConfirm }: {
+export default function ChooseExamCenter({ open, onOpenChange, initialCenter, initialRadiusM, hasPrevious, onConfirm }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialCenter: { lat: number; lng: number };
   initialRadiusM: number;
+  hasPrevious?: boolean;
   onConfirm: (center: { lat: number; lng: number }, radiusM: number) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -18,14 +20,35 @@ export default function ChooseExamCenter({ open, onOpenChange, initialCenter, in
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Place | null>(null);
   const [radiusKm, setRadiusKm] = useState(Math.round(initialRadiusM / 1000) || 10);
+  const [currentName, setCurrentName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setResults([]);
     setSelected(null);
-    setRadiusKm(Math.round(initialRadiusM / 1000) || 10);
-  }, [open, initialRadiusM]);
+    const suggested = isInBigCity(initialCenter.lat, initialCenter.lng).match ? 3 : 5;
+    setRadiusKm(Math.round((initialRadiusM || suggested * 1000) / 1000) || suggested);
+    if (hasPrevious) {
+      (async () => {
+        try {
+          const res = await fetch(`https://photon.komoot.io/reverse?lat=${encodeURIComponent(initialCenter.lat)}&lon=${encodeURIComponent(initialCenter.lng)}&lang=en`);
+          if (res.ok) {
+            const js = await res.json();
+            const props = js?.features?.[0]?.properties || {};
+            const city = props.city || props.town || props.village || props.name || props.state || props.country;
+            setCurrentName(city ? String(city) : `${initialCenter.lat.toFixed(5)}, ${initialCenter.lng.toFixed(5)}`);
+          } else {
+            setCurrentName(`${initialCenter.lat.toFixed(5)}, ${initialCenter.lng.toFixed(5)}`);
+          }
+        } catch {
+          setCurrentName(`${initialCenter.lat.toFixed(5)}, ${initialCenter.lng.toFixed(5)}`);
+        }
+      })();
+    } else {
+      setCurrentName(null);
+    }
+  }, [open, initialRadiusM, initialCenter, hasPrevious]);
 
   useEffect(() => {
     if (!query || query.length < 2) { setResults([]); return; }
@@ -64,6 +87,12 @@ export default function ChooseExamCenter({ open, onOpenChange, initialCenter, in
     onOpenChange(false);
   };
 
+  useEffect(() => {
+    if (!selected) return;
+    const big = isInBigCity(parseFloat(selected.lat), parseFloat(selected.lon)).match;
+    setRadiusKm(big ? 3 : 5);
+  }, [selected]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-xl">
@@ -72,15 +101,18 @@ export default function ChooseExamCenter({ open, onOpenChange, initialCenter, in
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Input placeholder="Type in the street name" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input placeholder="Type in a city or a street" value={query} onChange={(e) => setQuery(e.target.value)} />
+            {hasPrevious && currentName && (
+              <div className="mt-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">Current: {currentName}</div>
+            )}
             <div className="mt-2 max-h-56 overflow-auto rounded-md shadow">
               {loading && <div className="p-3 text-sm text-muted-foreground">Searching…</div>}
               {!loading && results.length === 0 && query.length >= 2 && (
                 <div className="p-3 text-sm text-muted-foreground">No results</div>
               )}
               <ul>
-                {results.map((r) => (
-                  <li key={`${r.lat},${r.lon}`}>
+                {results.map((r, i) => (
+                  <li key={`${r.lat},${r.lon},${i}`}>
                     <button
                       className={`w-full text-left px-3 py-2 ${selected?.lat === r.lat && selected?.lon === r.lon ? 'bg-black text-white' : 'hover:bg-accent'}`}
                       onClick={() => setSelected(r)}

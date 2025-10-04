@@ -17,10 +17,11 @@ L.Icon.Default.mergeOptions({
 
 export type RouteGeo = [number, number][];
 
-function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPEED_RADIUS_M, enabled = true, lightMode = false) {
-  const [segments, setSegments] = useState<{ id: number; latlngs: [number, number][], speed?: string }[]>([]);
+type FetchLevel = 'major' | 'major_tertiary' | 'all';
+function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPEED_RADIUS_M, enabled = true, fetchLevel: FetchLevel = 'all') {
+  const [segments, setSegments] = useState<{ id: number; latlngs: [number, number][], speed?: string, hw?: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const key = useMemo(() => `rr_maxspeed_${center.lat.toFixed(3)}_${center.lng.toFixed(3)}_${radius}_${lightMode ? 'light' : 'full'}`,[center, radius, lightMode]);
+  const key = useMemo(() => `rr_maxspeed_${center.lat.toFixed(3)}_${center.lng.toFixed(3)}_${radius}_${fetchLevel}`,[center, radius, fetchLevel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +33,7 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
         if (cached) {
           const parsed = JSON.parse(cached);
           const normalized = Array.isArray(parsed)
-            ? parsed.map((p: any, i: number) => ({ id: p.id ?? i, latlngs: p.latlngs, speed: p.speed, hw: p.hw, isMajor: p.isMajor }))
+            ? parsed.map((p: any, i: number) => ({ id: p.id ?? i, latlngs: p.latlngs, speed: p.speed, hw: p.hw }))
             : [];
           if (!cancelled) setSegments(normalized);
           try { sessionStorage.setItem(key, JSON.stringify(normalized)); } catch {}
@@ -40,49 +41,73 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
           return;
         }
         // Fetch ALL highway ways in area; do not restrict in lightMode to allow legend-based filtering
-        const q = `[out:json][timeout:25];(way(around:${radius},${center.lat},${center.lng})["highway"];);out geom tags;`;
+        const filter = fetchLevel === 'major' ? 'highway~"motorway|trunk|primary|secondary"' : (fetchLevel === 'major_tertiary' ? 'highway~"motorway|trunk|primary|secondary|tertiary"' : 'highway');
+        const q = `[out:json][timeout:25];(way(around:${radius},${center.lat},${center.lng})[${filter}];);out geom tags;`;
         const endpoints = [
           "https://overpass-api.de/api/interpreter",
           "https://overpass.kumi.systems/api/interpreter",
           "https://overpass.nchc.org.tw/api/interpreter",
           "https://z.overpass-api.de/api/interpreter",
         ];
-        async function safeFetchOverpass(u: string) {
+        async function safeFetchOverpass(ep: string, query: string) {
           if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return null;
-          try {
-            const f = fetch(u, {
-              mode: 'cors',
-              cache: 'no-store',
-              credentials: 'omit',
-              redirect: 'follow',
-              referrerPolicy: 'no-referrer',
-            }).catch(() => null as any);
-            const resOrTimeout = await Promise.race([
-              f,
-              new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 12000)),
-            ]);
-            if (resOrTimeout === 'timeout' || resOrTimeout == null) return null;
-            const res = resOrTimeout as Response;
-            if (!res || !res.ok) return null;
-            const text = await res.text().catch(() => null as any);
-            if (!text) return null;
-            try { return JSON.parse(text); } catch { return null; }
-          } catch {
-            return null;
-          }
+          // Use XHR to avoid 3rd-party fetch instrumentation logging errors
+          const xhrPost = (): Promise<any | null> => new Promise((resolve) => {
+            try {
+              const xhr = new XMLHttpRequest();
+              xhr.open('POST', ep, true);
+              xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+              xhr.timeout = 12000;
+              xhr.onreadystatechange = () => {
+                if (xhr.readyState === 4) {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try { resolve(JSON.parse(xhr.responseText)); } catch { resolve(null); }
+                  } else {
+                    resolve(null);
+                  }
+                }
+              };
+              xhr.ontimeout = () => resolve(null);
+              xhr.onerror = () => resolve(null);
+              xhr.send(`data=${encodeURIComponent(query)}`);
+            } catch { resolve(null); }
+          });
+          const xhrGet = (): Promise<any | null> => new Promise((resolve) => {
+            try {
+              const xhr = new XMLHttpRequest();
+              xhr.open('GET', `${ep}?data=${encodeURIComponent(query)}`, true);
+              xhr.timeout = 12000;
+              xhr.onreadystatechange = () => {
+                if (xhr.readyState === 4) {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try { resolve(JSON.parse(xhr.responseText)); } catch { resolve(null); }
+                  } else {
+                    resolve(null);
+                  }
+                }
+              };
+              xhr.ontimeout = () => resolve(null);
+              xhr.onerror = () => resolve(null);
+              xhr.send();
+            } catch { resolve(null); }
+          });
+          let js = await xhrPost();
+          if (!js) js = await xhrGet();
+          return js ?? null;
         }
         let json = null as any;
         for (const ep of endpoints) {
-          json = await safeFetchOverpass(`${ep}?data=${encodeURIComponent(q)}`);
+          json = await safeFetchOverpass(ep, q);
           if (json) break;
         }
         if (!json) { if (!cancelled) setSegments([]); setLoading(false); return; }
-        const segs: { id: number; latlngs: [number, number][], speed?: string }[] = [];
+        const segs: { id: number; latlngs: [number, number][], speed?: string, hw?: string }[] = [];
         for (const e of json.elements || []) {
           const tags = e.tags || {};
           const s = parseMaxSpeed(tags.maxspeed || tags["zone:maxspeed"] || tags["maxspeed:type"]);
+          const hw = tags.highway as string | undefined;
           const latlngs: [number, number][] = (e.geometry || []).map((g: any) => [Number(Number(g.lat).toFixed(5)), Number(Number(g.lon).toFixed(5))]);
-          if (latlngs.length >= 2) segs.push({ id: e.id, latlngs, speed: s });
+          if (latlngs.length >= 2) segs.push({ id: e.id, latlngs, speed: s, hw });
         }
         if (!cancelled) {
           setSegments(segs);
@@ -101,7 +126,7 @@ function useOverpassMaxspeed(center = KEMI_AJOVARMA_CENTER, radius = DEFAULT_SPE
     return () => {
       cancelled = true;
     };
-  }, [key, center, radius, enabled, lightMode]);
+  }, [key, center, radius, enabled, fetchLevel]);
 
   return { segments, loading };
 }
@@ -137,6 +162,28 @@ function createCenterIcon() {
   });
 }
 
+function xhrGetJSON(url: string, timeoutMs = 12000): Promise<any | null> {
+  return new Promise((resolve) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.timeout = timeoutMs;
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); } catch { resolve(null); }
+          } else {
+            resolve(null);
+          }
+        }
+      };
+      xhr.ontimeout = () => resolve(null);
+      xhr.onerror = () => resolve(null);
+      xhr.send();
+    } catch { resolve(null); }
+  });
+}
+
 function RouteAnimatedOverlay({ coords }: { coords: [number, number][] }) {
   const [progress, setProgress] = useState(0);
   useEffect(() => {
@@ -167,9 +214,26 @@ function RouteAnimatedOverlay({ coords }: { coords: [number, number][] }) {
   );
 }
 
+// Suppress noisy unhandled fetch rejections from 3rd-party instrumentation
+if (typeof window !== 'undefined') {
+  const handler = (e: PromiseRejectionEvent) => {
+    const msg = String((e as any)?.reason || '');
+    if (msg.includes('Failed to fetch')) {
+      try { e.preventDefault(); } catch {}
+    }
+  };
+  window.addEventListener('unhandledrejection', handler);
+}
+
 export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: number, lng: number) => void }) {
-  const { speedLimitsOn, speedVisibility, cityLightMode, pins, pinView, user, collectPin, route, setRoute, center, rangeCenter, setRangeCenter, radiusM, deletePin } = useAppState();
-  const { segments } = useOverpassMaxspeed(rangeCenter, radiusM, speedLimitsOn, cityLightMode);
+  const { speedLimitsOn, speedVisibility, pins, pinView, user, collectPin, route, setRoute, center, rangeCenter, setRangeCenter, radiusM, deletePin } = useAppState();
+  const [zoom, setZoom] = useState(12);
+  function ZoomWatcher() {
+    useMapEvents({ zoomend(e) { setZoom(e.target.getZoom()); }, zoom(e) { setZoom(e.target.getZoom()); } });
+    return null;
+  }
+  const fetchLevel: FetchLevel = zoom <= 11.5 ? 'major' : (zoom <= 13.5 ? 'major_tertiary' : 'all');
+  const { segments } = useOverpassMaxspeed(rangeCenter, radiusM, speedLimitsOn, fetchLevel);
 
   const [speedEdits, setSpeedEdits] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -209,12 +273,23 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
 
         <Pane name="speedPane" style={{ zIndex: 410 }} />
         <Pane name="routePane" style={{ zIndex: 450 }} />
+        <ZoomWatcher />
 
         {speedLimitsOn &&
           segments.map((s, idx) => {
             const wayKey = String((s as any).id ?? idx);
             const effective = (speedEdits[wayKey] ?? s.speed) as string | undefined;
             const label = effective && (SPEED_WEIGHTS as any)[effective] != null ? effective : 'ungiven';
+            // Zoom-based visibility by highway class
+            const hw = (s as any).hw as string | undefined;
+            const showByZoom = () => {
+              if (!hw) return zoom > 13.5; // unknown types only when close
+              if (/^(motorway|trunk|primary|secondary)$/.test(hw)) return true;
+              if (/^tertiary$/.test(hw)) return zoom > 11.5;
+              // residential, service, unclassified, living_street, etc only when close
+              return zoom > 13.5;
+            };
+            if (!showByZoom()) return null;
             if (speedVisibility[label] === false) return null;
             const mid = s.latlngs[Math.floor(s.latlngs.length / 2)] || s.latlngs[0];
             const dist = mid ? haversineDistanceMeters({ lat: mid[0], lng: mid[1] }, rangeCenter) : Infinity;
@@ -234,7 +309,7 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
                   pathOptions={{
                     color: (effective && SPEED_COLORS[effective]) || (SPEED_COLORS as any)["ungiven"] || "#64748b",
                     weight: (effective && SPEED_WEIGHTS[effective]) ?? (SPEED_WEIGHTS as any)["ungiven"] ?? SPEED_WEIGHTS["20"],
-                    opacity: inside ? (effective ? 0.9 : 0.5) : 0.15,
+                    opacity: inside ? (effective ? 0.95 : Math.min(0.8, Math.max(0.25, (zoom - 12) * 0.25))) : 0.12,
                     className: "rr-speed-edit rr-pencil-cursor",
                   }}
                 />
@@ -310,22 +385,15 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
                 if (j > 0 && j < n - 1 && !idxs.includes(j)) idxs.push(j);
               }
               async function snapNearest(lng: number, lat: number): Promise<[number, number]> {
-                try {
-                  const res = await fetch(`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}`);
-                  if (res.ok) {
-                    const js = await res.json();
-                    const p = js?.waypoints?.[0]?.location;
-                    if (Array.isArray(p) && p.length >= 2) return [p[0], p[1]];
-                  }
-                } catch {}
+                const js = await xhrGetJSON(`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}`);
+                const p = js?.waypoints?.[0]?.location;
+                if (Array.isArray(p) && p.length >= 2) return [p[0], p[1]];
                 return [lng, lat];
               }
               async function osrmRoute(vias: [number, number][]): Promise<[number, number][]> {
                 const s = vias.map((c) => `${c[0]},${c[1]}`).join(";");
                 const url = `https://router.project-osrm.org/route/v1/driving/${s}?alternatives=false&overview=full&geometries=geojson`;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error("routing failed");
-                const js = await res.json();
+                const js = await xhrGetJSON(url);
                 const r = js?.routes?.[0];
                 return (r?.geometry?.coordinates ?? []) as [number, number][];
               }

@@ -49,7 +49,7 @@ export type Pin = {
 };
 
 export type RouteShape = { coordinates: [number, number][]; durationSec?: number; milestones?: { timeSec: number; coord: [number, number] }[] } | null;
-export type SavedRoute = { id: string; createdAt: string; route: RouteShape };
+export type SavedRoute = { id: string; createdAt: string; route: RouteShape; city?: string };
 
 export type AppStateShape = {
   user: User | null;
@@ -231,14 +231,24 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (!route || !route.coordinates || route.coordinates.length < 2) return;
     const entry: SavedRoute = { id: `route_${Date.now()}`, createdAt: new Date().toISOString(), route: JSON.parse(JSON.stringify(route)) };
     setSavedRoutes((prev) => [entry, ...prev]);
-    try {
-      toast({ title: 'Your route is saved! check it in "My routes"' });
-    } catch {}
-    try {
-      const evt = new CustomEvent('open-my-routes');
-      window.dispatchEvent(evt);
-    } catch {}
-  }, [route]);
+    (async () => {
+      try {
+        const lat = center.lat; const lon = center.lng;
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const res = await fetch(`https://photon.komoot.io/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&lang=en`, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (res.ok) {
+          const js = await res.json();
+          const props = js?.features?.[0]?.properties || {};
+          const city = props.city || props.town || props.village || props.name || props.state || props.country;
+          if (city) setSavedRoutes((prev) => prev.map((r) => r.id === entry.id ? { ...r, city: city as string } : r));
+        }
+      } catch {}
+    })();
+    try { toast({ title: 'Your route is saved! check it in "My routes"' }); } catch {}
+    try { const evt = new CustomEvent('open-my-routes'); window.dispatchEvent(evt); } catch {}
+  }, [route, center]);
 
   const loadSavedRoute = useCallback((id: string) => {
     const item = savedRoutes.find((r) => r.id === id);
