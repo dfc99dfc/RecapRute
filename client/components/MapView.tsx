@@ -313,25 +313,26 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
                     className: "rr-speed-edit rr-pencil-cursor",
                   }}
                 />
-                {!effective && (
-                  <Polyline
-                    key={`${wayKey}-hit`}
-                    positions={s.latlngs}
-                    eventHandlers={{
-                      click: (e) => {
-                        setEditWayId(wayKey);
-                        setEditAnchor([e.latlng.lat, e.latlng.lng]);
-                      },
-                    }}
-                    pane="speedPane"
-                    pathOptions={{
-                      color: "#000000",
-                      weight: 12,
-                      opacity: inside ? 0 : 0, // invisible hit area either way
-                      className: "rr-speed-hit rr-pencil-cursor",
-                    }}
-                  />
-                )}
+                <Polyline
+                  key={`${wayKey}-hit`}
+                  positions={s.latlngs}
+                  eventHandlers={{
+                    click: (e) => {
+                      setEditWayId(wayKey);
+                      setEditAnchor([e.latlng.lat, e.latlng.lng]);
+                    },
+                  }}
+                  pane="speedPane"
+                  interactive={true}
+                  pathOptions={{
+                    color: "#000000",
+                    weight: 26,
+                    opacity: 0.001,
+                    className: "rr-speed-hit rr-pencil-cursor",
+                    lineCap: "round",
+                    lineJoin: "round",
+                  }}
+                />
               </React.Fragment>
             );
           })}
