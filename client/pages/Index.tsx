@@ -12,7 +12,6 @@ import ExportImportButtons from "@/components/export-import/ExportImportButtons"
 import ChooseExamCenter from "@/components/center/ChooseExamCenter";
 import MyRoutesSheet from "@/components/routes/MyRoutesSheet";
 import MindsetSheet from "@/components/mind/MindsetSheet";
-import AdsTop from "@/components/AdsTop";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 function HeaderBar() {
@@ -189,11 +188,6 @@ function MapScene() {
   return (
     <div className="relative h-[100dvh] w-full">
       <MapView onMapClickForPin={handleMapClick} />
-      <div className="pointer-events-auto absolute inset-x-0 top-0 z-[1200] flex items-center justify-center p-2">
-        <div className="w-full max-w-5xl">
-          <AdsTop />
-        </div>
-      </div>
       <HeaderBar />
       <BottomBar />
       <div className="pointer-events-none absolute right-3 top-1/2 z-[1000] -translate-y-1/2 hidden md:block">
