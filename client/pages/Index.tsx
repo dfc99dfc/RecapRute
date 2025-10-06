@@ -185,6 +185,12 @@ function MapScene() {
     return () => clearInterval(id);
   }, [loading]);
 
+  useEffect(() => {
+    const onOpen = () => setRoutesOpen(true);
+    window.addEventListener('open-my-routes', onOpen as any);
+    return () => window.removeEventListener('open-my-routes', onOpen as any);
+  }, []);
+
   return (
     <div className="relative h-[100dvh] w-full">
       <MapView onMapClickForPin={handleMapClick} />
@@ -213,12 +219,6 @@ function MapScene() {
       )}
       <PinModal open={pinModal} onOpenChange={setPinModal} lat={lat} lng={lng} />
       <MyRoutesSheet open={routesOpen} onOpenChange={setRoutesOpen} />
-      {/* Allow HeaderBar to open My Routes on mobile */}
-      {useEffect(() => {
-        const onOpen = () => setRoutesOpen(true);
-        window.addEventListener('open-my-routes', onOpen as any);
-        return () => window.removeEventListener('open-my-routes', onOpen as any);
-      }, []), null}
     </div>
   );
 }
