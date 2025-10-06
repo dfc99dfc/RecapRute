@@ -166,7 +166,7 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                             </div>
                           </div>
                         ) : (
-                          <div className="mt-2 prose prose-sm max-w-none whitespace-pre-wrap break-words">{content}</div>
+                          <div className="mt-2 prose prose-sm max-w-none whitespace-pre-wrap break-words max-h-[60vh] overflow-auto pr-2">{content}</div>
                         )}
                       </div>
                     )}
@@ -209,7 +209,7 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-3 prose prose-sm max-w-none whitespace-pre-wrap break-words">{content}</div>
+                      <div className="mt-3 prose prose-sm max-w-none whitespace-pre-wrap break-words max-h-[65vh] overflow-auto pr-2">{content}</div>
                     )}
                   </div>
                 )}

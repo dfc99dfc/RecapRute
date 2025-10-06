@@ -37,8 +37,12 @@ export default function ExportImportButtons() {
           route: incoming.route ?? null,
           points: typeof incoming.points === 'number' ? incoming.points : 0,
           center: incoming.center,
+          rangeCenter: incoming.rangeCenter,
           radiusM: typeof incoming.radiusM === 'number' ? incoming.radiusM : 10000,
           hasCenter: typeof incoming.hasCenter === 'boolean' ? incoming.hasCenter : (incoming.center != null),
+          savedRoutes: Array.isArray(incoming.savedRoutes) ? incoming.savedRoutes : [],
+          mindArticles: Array.isArray(incoming.mindArticles) ? incoming.mindArticles : [],
+          mindArticleOverrides: typeof incoming.mindArticleOverrides === 'object' && incoming.mindArticleOverrides ? incoming.mindArticleOverrides : {},
         };
         await persistence.savePartial(next);
         toast.success("Data imported");
