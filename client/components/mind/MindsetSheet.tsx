@@ -12,6 +12,7 @@ type CustomArticle = { id: string; title: string; content: string; createdAt: st
 type AnyArticle = BuiltinArticle | CustomArticle;
 
 export default function MindsetSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const MAX_MINDSET_CHARS = 100000;
   const isMobile = useIsMobile();
   const [builtin, setBuiltin] = useState<BuiltinArticle[]>([]);
   const [custom, setCustom] = useState<CustomArticle[]>([]);
@@ -124,7 +125,8 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
               <div className="mb-4 rounded-md border p-3">
                 <div className="space-y-2">
                   <Input placeholder="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-                  <Textarea rows={10} placeholder="Write content..." value={newContent} onChange={(e) => setNewContent(e.target.value)} />
+                  <Textarea rows={10} placeholder="Write content..." value={newContent} onChange={(e) => setNewContent(e.target.value)} maxLength={MAX_MINDSET_CHARS} />
+                  <div className="text-xs text-muted-foreground text-right">{Math.max(0, MAX_MINDSET_CHARS - (newContent?.length || 0))} left</div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={saveCreate}>Save</Button>
                     <Button size="sm" variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
@@ -156,7 +158,8 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                         {editing ? (
                           <div className="mt-2 space-y-2">
                             <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                            <Textarea rows={10} value={content} onChange={(e) => setContent(e.target.value)} />
+                            <Textarea rows={10} value={content} onChange={(e) => setContent(e.target.value)} maxLength={MAX_MINDSET_CHARS} />
+                            <div className="text-xs text-muted-foreground text-right">{Math.max(0, MAX_MINDSET_CHARS - (content?.length || 0))} left</div>
                             <div className="flex gap-2">
                               <Button size="sm" onClick={saveEdit}>Save</Button>
                               <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
@@ -179,7 +182,8 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                 {creating ? (
                   <div className="space-y-2">
                     <Input placeholder="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-                    <Textarea rows={14} placeholder="Write content..." value={newContent} onChange={(e) => setNewContent(e.target.value)} />
+                    <Textarea rows={14} placeholder="Write content..." value={newContent} onChange={(e) => setNewContent(e.target.value)} maxLength={MAX_MINDSET_CHARS} />
+                    <div className="text-xs text-muted-foreground text-right">{Math.max(0, MAX_MINDSET_CHARS - (newContent?.length || 0))} left</div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={saveCreate}>Save</Button>
                       <Button size="sm" variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
@@ -197,7 +201,8 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                     {editing ? (
                       <div className="mt-3 space-y-2">
                         <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                        <Textarea rows={14} value={content} onChange={(e) => setContent(e.target.value)} />
+                        <Textarea rows={14} value={content} onChange={(e) => setContent(e.target.value)} maxLength={MAX_MINDSET_CHARS} />
+                        <div className="text-xs text-muted-foreground text-right">{Math.max(0, MAX_MINDSET_CHARS - (content?.length || 0))} left</div>
                         <div className="flex gap-2">
                           <Button size="sm" onClick={saveEdit}>Save</Button>
                           <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
