@@ -6,9 +6,9 @@ import RouteSimulator, { useRouteSimulation } from "@/components/RouteSimulator"
 import { AppStateProvider, useAppState } from "@/state/AppState";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { KEMI_AJOVARMA_CENTER, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER, SPEED_LEGEND_ORDER_EXTENDED } from "@/constants";
-import { isInBigCity } from "@/utils/bigCities";
+import { KEMI_AJOVARMA_CENTER, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER_EXTENDED } from "@/constants";
 import ExportImportButtons from "@/components/export-import/ExportImportButtons";
+import { isInBigCity } from "@/utils/bigCities";
 import ChooseExamCenter from "@/components/center/ChooseExamCenter";
 import MyRoutesSheet from "@/components/routes/MyRoutesSheet";
 import MindsetSheet from "@/components/mind/MindsetSheet";

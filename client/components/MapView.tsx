@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, Circle, Pane, Tooltip } from "react-leaflet";
 import L, { DivIcon } from "leaflet";
 import EditPinModal from "@/components/pins/EditPinModal";
-import { DEFAULT_SPEED_RADIUS_M, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER, KEMI_AJOVARMA_CENTER } from "@/constants";
+import { DEFAULT_SPEED_RADIUS_M, SPEED_COLORS, SPEED_WEIGHTS, SPEED_LEGEND_ORDER_EXTENDED, KEMI_AJOVARMA_CENTER } from "@/constants";
 import { useAppState } from "@/state/AppState";
 import { parseMaxSpeed, distancePointToPolylineMeters, haversineDistanceMeters } from "@/utils/mapUtils";
 
@@ -341,7 +341,7 @@ export default function MapView({ onMapClickForPin }: { onMapClickForPin: (lat: 
             <div className="min-w-[140px]">
               <div className="mb-2 text-sm font-medium">Set max speed</div>
               <div className="grid grid-cols-1 gap-1">
-                {SPEED_LEGEND_ORDER.map((k) => (
+                {SPEED_LEGEND_ORDER_EXTENDED.map((k) => (
                   <button
                     key={k}
                     className="flex items-center justify-start gap-2 rounded-md border p-1 text-sm"
