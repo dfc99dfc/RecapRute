@@ -58,6 +58,9 @@ export default function ExportImportButtons() {
   return (
     <div className="flex flex-col items-end gap-1 text-right">
       <div className="flex gap-2">
+        <Button asChild size="sm" variant="outline">
+          <a href="https://buy.stripe.com/8x26oH5YZcv2aKc3wY2Ry0d" target="_blank" rel="noopener noreferrer">☕️</a>
+        </Button>
         <Button size="sm" variant="outline" onClick={doExport}>Export</Button>
         <Button size="sm" onClick={doImport}>Import</Button>
       </div>
