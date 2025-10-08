@@ -135,7 +135,7 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
               </div>
             )}
 
-            <ul className="space-y-1 max-h-[65vh] overflow-auto pr-2">
+            <ul className="space-y-1">
               {all.map((a) => {
                 const opened = active?.id === a.id;
                 return (
@@ -166,7 +166,7 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                             </div>
                           </div>
                         ) : (
-                          <div className="mt-2 prose prose-sm max-w-none whitespace-pre-wrap break-words max-h-[60vh] overflow-auto pr-2">{content}</div>
+                          <div className="mt-2 prose prose-sm max-w-none whitespace-pre-wrap break-words">{content}</div>
                         )}
                       </div>
                     )}
@@ -209,14 +209,14 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-3 prose prose-sm max-w-none whitespace-pre-wrap break-words max-h-[65vh] overflow-auto pr-2">{content}</div>
+                      <div className="mt-3 prose prose-sm max-w-none whitespace-pre-wrap break-words">{content}</div>
                     )}
                   </div>
                 )}
               </div>
 
-              <aside className="w-[380px] shrink-0 overflow-auto max-h-[70vh]">
-                <ul className="space-y-1 max-h-[65vh] overflow-auto pr-2">
+              <aside className="w-[380px] shrink-0">
+                <ul className="space-y-1">
                   {all.map((a) => (
                     <li key={a.id}>
                       <button className={`w-full text-left rounded-md px-2 py-1 hover:bg-accent ${active?.id===a.id? 'bg-accent':''}`} onClick={() => { setCreating(false); setEditing(false); setActive(a); }}>
@@ -229,8 +229,8 @@ export default function MindsetSheet({ open, onOpenChange }: { open: boolean; on
             </div>
           ) : (
             <div className="mt-4 w-[380px]">
-              <aside className="overflow-auto max-h-[70vh]">
-                <ul className="space-y-1 max-h-[65vh] overflow-auto pr-2">
+              <aside className="">
+                <ul className="space-y-1">
                   {all.map((a) => (
                     <li key={a.id}>
                       <button className="w-full text-left rounded-md px-2 py-1 hover:bg-accent" onClick={() => { setCreating(false); setEditing(false); setActive(a); }}>
