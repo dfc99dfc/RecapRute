@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@types/leaflet": "^1.9.20",
+    "@vercel/analytics": "^1.5.0",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "leaflet": "^1.9.4",
@@ -75,8 +76,11 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.12",
     "globals": "^16.3.0",
@@ -103,9 +107,6 @@
     "vaul": "^1.1.2",
     "vite": "^7.1.2",
     "vitest": "^3.2.4",
-    "electron": "^32.2.0",
-    "electron-builder": "^25.1.8",
-    "concurrently": "^9.1.2",
     "wait-on": "^8.0.1"
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748",
@@ -121,8 +122,22 @@
         "to": "articles"
       }
     ],
-    "mac": { "target": ["dmg"], "category": "public.app-category.education" },
-    "win": { "target": ["nsis"] },
-    "linux": { "target": ["AppImage"], "category": "Education" }
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.education"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Education"
+    }
   }
 }
